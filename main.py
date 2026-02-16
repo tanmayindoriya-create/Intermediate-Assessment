@@ -9,6 +9,14 @@ from spark_jobs.bronze import customers as bronze_customers
 from spark_jobs.bronze import products as bronze_products
 from spark_jobs.bronze import transactions as bronze_transactions
 
+# Silver imports
+from spark_jobs.silver import products as silver_products
+from spark_jobs.silver import transactions as silver_transactions
+from spark_jobs.silver import customers as silver_customers
+
+# gold imports
+from spark_jobs.gold import analytics as gold_analytics
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -26,13 +34,16 @@ def main():
 
     logger.info(f"Running stage: {args.stage}")
 
-    # -------- Stage Routing --------
     if args.stage == "bronze":
         bronze_customers.run(spark, config, logger)
         bronze_products.run(spark, config, logger)
         bronze_transactions.run(spark, config, logger)
-
-    # (silver & gold will be added later)
+    elif args.stage == "silver":
+        silver_products.run(spark, config, logger)
+        silver_transactions.run(spark, config, logger)
+        silver_customers.run(spark, config, logger)
+    elif args.stage == "gold":
+        gold_analytics.run(spark, config, logger)
 
 
 if __name__ == "__main__":

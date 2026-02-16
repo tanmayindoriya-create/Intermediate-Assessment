@@ -30,7 +30,6 @@ def run(spark, config, logger):
     total_count = df.count()
     logger.info(f"Raw records read: {total_count}")
 
-    # Drop rows missing primary key
     df_clean = df.dropna(subset=["transaction_id"])
 
     clean_count = df_clean.count()
@@ -41,7 +40,6 @@ def run(spark, config, logger):
 
     df_clean = df_clean.withColumn("ingestion_ts", F.current_timestamp())
 
-    # Partition by transaction_date (important for analytics & fraud windows)
     (
         df_clean.write
         .mode("append")
