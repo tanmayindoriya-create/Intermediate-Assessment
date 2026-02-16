@@ -32,9 +32,11 @@ updates = df.sample(int(N*0.1))
 scd_records = []
 for _, row in updates.iterrows():
     change_date = datetime(2026,1,1)
-    row["is_current"] = False
-    row["effective_to"] = change_date.strftime("%Y-%m-%d")
-    scd_records.append(row)
+
+    old_row = row.copy()
+    old_row["is_current"] = False
+    old_row["effective_to"] = change_date.strftime("%Y-%m-%d")
+    scd_records.append(old_row.tolist())
 
     scd_records.append([
         row["customer_id"],
@@ -45,6 +47,7 @@ for _, row in updates.iterrows():
         change_date.strftime("%Y-%m-%d"),
         None
     ])
+
 
 df = pd.concat([df, pd.DataFrame(scd_records, columns=df.columns)])
 df.to_csv("../data/raw/customers.csv", index=False)

@@ -1,0 +1,20 @@
+app:
+  name: data-platform
+
+paths:
+  raw: data/raw
+  bronze: data/bronze
+  silver: data/silver
+  gold: data/gold
+
+spark:
+  app_name: data-platform
+  master: local[*]
+  configs:
+    spark.sql.shuffle.partitions: 4
+    spark.sql.execution.arrow.pyspark.enabled: true
+
+mysql:
+  host: localhost
+  port: 3306
+  database: data_platform
