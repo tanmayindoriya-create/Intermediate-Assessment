@@ -12,7 +12,6 @@ def run(spark, config, logger):
     total_count = df.count()
     logger.info(f"Bronze records read: {total_count}")
 
-    # Basic cleaning
     df_clean = (
         df.dropna(subset=["product_id"])
           .filter(F.col("price") > 0)

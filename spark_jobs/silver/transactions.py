@@ -10,6 +10,11 @@ def run(spark, config, logger):
 
     df = spark.read.parquet(bronze_path)
 
+    df = df.withColumn(
+        "transaction_date",
+        F.to_date("transaction_date")
+    )
+
     total_count = df.count()
     logger.info(f"Bronze records read: {total_count}")
 

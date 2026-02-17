@@ -9,6 +9,10 @@ def run(spark, config, logger):
     silver_path = f"{config['paths']['silver']}/customers"
 
     df_bronze = spark.read.parquet(bronze_path)
+    df_bronze = df_bronze \
+    .withColumn("signup_date", F.to_date("signup_date")) \
+    .withColumn("effective_from", F.to_date("effective_from")) \
+    .withColumn("effective_to", F.to_date("effective_to"))
 
     window = Window.partitionBy("customer_id", "effective_from").orderBy(F.col("ingestion_ts").desc())
 
