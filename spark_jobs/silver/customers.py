@@ -1,6 +1,7 @@
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
-
+from utils.jdbc import write_to_mysql
+from utils.config import get_mysql_credentials
 
 def run(spark, config, logger):
     logger.info("Starting Silver transformation: customers (SCD2)")
@@ -23,17 +24,34 @@ def run(spark, config, logger):
         .drop("rn")
     )
 
-    if not spark._jsparkSession.catalog().tableExists("default.customers_silver_temp"):
+    import os
+
+    if not os.path.exists(silver_path):
         logger.info("Initial SCD2 load (no existing Silver)")
 
+        df_final = df_latest
+
         (
-            df_latest.write
+            df_final.write
             .mode("overwrite")
             .parquet(silver_path)
         )
 
+        credentials = get_mysql_credentials()
+
+        write_to_mysql(
+            df_final,
+            "dim_customer",
+            config,
+            credentials,
+            mode="overwrite"
+        )
+
+        logger.info("Saved data to mysql: dim_customer")
         logger.info("Completed initial Silver load: customers")
+
         return
+   
 
     df_silver = spark.read.parquet(silver_path)
 
@@ -72,6 +90,8 @@ def run(spark, config, logger):
     )
 
     df_final = df_unchanged.unionByName(df_old_closed).unionByName(df_new_versions)
+    df_final = df_final.cache()
+    df_final.count()
 
     (
         df_final.write
@@ -80,3 +100,15 @@ def run(spark, config, logger):
     )
 
     logger.info("Completed Silver transformation: customers (SCD2)")
+
+    credentials = get_mysql_credentials()
+
+    write_to_mysql(
+    df_final,
+    "dim_customer",
+    config,
+    credentials,
+    mode="overwrite"
+    )
+
+    logger.info("Saved data to mysql: dim_customers")

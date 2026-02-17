@@ -1,5 +1,6 @@
 from pyspark.sql import functions as F
-
+from utils.jdbc import write_to_mysql
+from utils.config import get_mysql_credentials
 
 def run(spark, config, logger):
     logger.info("Starting Silver transformation: products")
@@ -27,3 +28,15 @@ def run(spark, config, logger):
     )
 
     logger.info("Completed Silver transformation: products")
+
+    credentials = get_mysql_credentials()
+
+    write_to_mysql(
+        df_clean,
+        "dim_product",
+        config,
+        credentials,
+        mode="overwrite"
+    )
+
+    logger.info("Saved data to mysql: dim_products")

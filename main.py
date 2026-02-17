@@ -39,8 +39,8 @@ def main():
         bronze_products.run(spark, config, logger)
         bronze_transactions.run(spark, config, logger)
     elif args.stage == "silver":
-        silver_products.run(spark, config, logger)
-        silver_transactions.run(spark, config, logger)
+        # silver_products.run(spark, config, logger)
+        # silver_transactions.run(spark, config, logger)
         silver_customers.run(spark, config, logger)
     elif args.stage == "gold":
         gold_analytics.run(spark, config, logger)

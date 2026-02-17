@@ -1,5 +1,7 @@
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
+from utils.jdbc import write_to_mysql
+from utils.config import get_mysql_credentials
 
 
 def run(spark, config, logger):
@@ -44,3 +46,29 @@ def run(spark, config, logger):
     )
 
     logger.info("Completed Silver transformation: transactions")
+
+    df_fact = (
+        df_dedup
+        .select(
+            F.col("transaction_id"),
+            F.col("customer_id"),
+            F.col("product_id"),
+            F.col("amount"),
+            F.col("transaction_date"),
+            F.col("status"),
+            F.col("channel")
+        )
+    )
+
+    credentials = get_mysql_credentials()
+
+    write_to_mysql(
+        df_fact,
+        "fact_transactions",
+        config,
+        credentials,
+        mode="overwrite"
+    )
+
+
+    logger.info("saved data to mysql: fact_transactions")
