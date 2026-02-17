@@ -22,7 +22,7 @@ from fraud import detection as fraud_detection
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--stage", required=True, choices=["bronze", "silver", "gold", "fraud"])
+    parser.add_argument("--stage", required=True, choices=["bronze", "silver", "gold", "fraud","test"])
     args = parser.parse_args()
 
     config = load_config()
@@ -48,7 +48,8 @@ def main():
         gold_analytics.run(spark, config, logger)
     elif args.stage == "fraud":
         fraud_detection.run(spark, config, logger)
-
+    elif args.stage == "test":
+        pass
 
 if __name__ == "__main__":
     main()

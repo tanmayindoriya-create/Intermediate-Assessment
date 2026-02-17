@@ -9,7 +9,7 @@ def get_spark(app_name: str, master: str, configs: dict) -> SparkSession:
         builder = SparkSession.builder.appName(app_name).master(master)
         builder = builder.config(
             "spark.jars",
-            "jars/mysql-connector-j-8.3.0.jar"
+            configs["jar"]
         )
 
         for k, v in configs.items():

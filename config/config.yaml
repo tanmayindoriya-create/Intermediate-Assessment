@@ -13,6 +13,7 @@ spark:
   configs:
     spark.sql.shuffle.partitions: 4
     spark.sql.execution.arrow.pyspark.enabled: true
+    jar: jars/mysql-connector-j-8.3.0.jar
 
 mysql:
   url: jdbc:mysql://localhost:3306/data_platform

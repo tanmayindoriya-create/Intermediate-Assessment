@@ -38,8 +38,6 @@ def run(spark, config, logger):
 
     df_top_products.write.mode("overwrite").parquet(f"{gold_base}/top_products")
 
-    df_current_customers = df_customers.filter(F.col("is_current") == True)
-
     # regional performance
     df_regional = (
         df_txn.filter(F.col("status") == "completed")
@@ -63,5 +61,8 @@ def run(spark, config, logger):
     )
 
     df_customer_activity.write.mode("overwrite").parquet(f"{gold_base}/customer_retention")
+
+    # current customers
+    df_current_customers = df_customers.filter(F.col("is_current") == True)
 
     logger.info("Completed Gold layer analytics")

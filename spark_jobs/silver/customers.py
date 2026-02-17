@@ -104,11 +104,11 @@ def run(spark, config, logger):
     credentials = get_mysql_credentials()
 
     write_to_mysql(
-    df_final,
-    "dim_customer",
-    config,
-    credentials,
-    mode="overwrite"
+        df_final,
+        "dim_customer",
+        config,
+        credentials,
+        mode="overwrite"
     )
 
     logger.info("Saved data to mysql: dim_customers")
