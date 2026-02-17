@@ -6,6 +6,10 @@ paths:
   bronze: data/bronze
   silver: data/silver
   gold: data/gold
+  stream:
+    input: data/stream_input
+    output: data/stream_output
+    checkpoint: data/stream_checkpoint
 
 spark:
   app_name: data-platform

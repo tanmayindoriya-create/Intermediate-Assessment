@@ -1,5 +1,6 @@
 import argparse
 
+# utils
 from utils.config import load_config
 from utils.spark import get_spark
 from utils.logger import get_logger
@@ -20,9 +21,12 @@ from spark_jobs.gold import analytics as gold_analytics
 # fraud_detection import
 from fraud import detection as fraud_detection
 
+# streaming import
+from streaming import transactions_stream
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--stage", required=True, choices=["bronze", "silver", "gold", "fraud","test"])
+    parser.add_argument("--stage", required=True, choices=["bronze", "silver", "gold", "fraud", "stream" ,"test"])
     args = parser.parse_args()
 
     config = load_config()
@@ -48,6 +52,8 @@ def main():
         gold_analytics.run(spark, config, logger)
     elif args.stage == "fraud":
         fraud_detection.run(spark, config, logger)
+    elif args.stage == "stream":
+        transactions_stream.run(spark, config["paths"], logger)
     elif args.stage == "test":
         pass
 

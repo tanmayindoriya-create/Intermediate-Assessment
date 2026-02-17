@@ -9,6 +9,9 @@ env/
 data/bronze/
 data/silver/
 data/gold/
+data/stream_input
+data/stream_output
+data/stream_checkpoint
 *.parquet
 *.csv
 *.json

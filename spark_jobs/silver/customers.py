@@ -55,11 +55,9 @@ def run(spark, config, logger):
 
     df_silver = spark.read.parquet(silver_path)
 
-    join_cond = ["customer_id"]
-
     df_joined = df_latest.alias("new").join(
         df_silver.filter(F.col("is_current") == True).alias("old"),
-        on=join_cond,
+        on="customer_id",
         how="left"
     )
 
