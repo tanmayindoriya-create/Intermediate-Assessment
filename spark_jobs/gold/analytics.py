@@ -25,15 +25,26 @@ def run(spark, config, logger):
     df_monthly_revenue.write.mode("overwrite").parquet(f"{gold_base}/monthly_revenue")
 
     # top products
-    df_top_products = (
-        df_txn.filter(F.col("status") == "completed")
-        .groupBy("product_id")
+
+    df_salted = df_txn.filter(F.col("status") == "completed") \
+        .withColumn("salt", (F.rand() * 10).cast("int"))
+
+    df_partial = (
+        df_salted
+        .groupBy("product_id", "salt")
         .agg(
             F.count("*").alias("txn_count"),
             F.sum("amount").alias("total_sales")
         )
-        .join(df_products, on="product_id", how="left")
-        .orderBy(F.desc("total_sales"))
+    )
+
+    df_top_products = (
+        df_partial
+        .groupBy("product_id")
+        .agg(
+            F.sum("txn_count").alias("txn_count"),
+            F.sum("total_sales").alias("total_sales")
+        )
     )
 
     df_top_products.write.mode("overwrite").parquet(f"{gold_base}/top_products")

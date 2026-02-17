@@ -18,6 +18,9 @@ spark:
     spark.sql.shuffle.partitions: 4
     spark.sql.execution.arrow.pyspark.enabled: true
     jar: jars/mysql-connector-j-8.3.0.jar
+    spark.sql.adaptive.enabled: true
+    spark.sql.adaptive.skewJoin.enabled: true
+    spark.sql.adaptive.coalescePartitions.enabled: true
 
 mysql:
   url: jdbc:mysql://localhost:3306/data_platform
