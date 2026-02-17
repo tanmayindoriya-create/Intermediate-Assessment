@@ -64,29 +64,4 @@ def run(spark, config, logger):
 
     df_customer_activity.write.mode("overwrite").parquet(f"{gold_base}/customer_retention")
 
-
-    # fraud detection
-    df_high_amount = df_txn.filter(F.col("amount") > 5000)
-
-    df_daily_counts = (
-        df_txn.groupBy("customer_id", "transaction_date")
-        .agg(F.count("*").alias("daily_txn_count"))
-    )
-
-    df_suspicious_daily = df_daily_counts.filter(F.col("daily_txn_count") > 10)
-
-    df_fraud = (
-        df_high_amount.select("transaction_id", "customer_id", "amount")
-        .unionByName(
-            df_txn.join(
-                df_suspicious_daily.select("customer_id", "transaction_date"),
-                on=["customer_id", "transaction_date"],
-                how="inner"
-            ).select("transaction_id", "customer_id", "amount")
-        )
-        .dropDuplicates(["transaction_id"])
-    )
-
-    df_fraud.write.mode("overwrite").parquet(f"{gold_base}/fraud_flags")
-
     logger.info("Completed Gold layer analytics")

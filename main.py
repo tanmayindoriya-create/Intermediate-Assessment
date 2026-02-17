@@ -17,10 +17,12 @@ from spark_jobs.silver import customers as silver_customers
 # gold imports
 from spark_jobs.gold import analytics as gold_analytics
 
+# fraud_detection import
+from fraud import detection as fraud_detection
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--stage", required=True, choices=["bronze", "silver", "gold"])
+    parser.add_argument("--stage", required=True, choices=["bronze", "silver", "gold", "fraud"])
     args = parser.parse_args()
 
     config = load_config()
@@ -39,11 +41,13 @@ def main():
         bronze_products.run(spark, config, logger)
         bronze_transactions.run(spark, config, logger)
     elif args.stage == "silver":
-        # silver_products.run(spark, config, logger)
-        # silver_transactions.run(spark, config, logger)
+        silver_products.run(spark, config, logger)
+        silver_transactions.run(spark, config, logger)
         silver_customers.run(spark, config, logger)
     elif args.stage == "gold":
         gold_analytics.run(spark, config, logger)
+    elif args.stage == "fraud":
+        fraud_detection.run(spark, config, logger)
 
 
 if __name__ == "__main__":
