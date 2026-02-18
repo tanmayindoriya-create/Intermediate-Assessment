@@ -6,7 +6,15 @@ __pycache__/
 env/
 .env
 
-data/
+data/raw/*
+data/bronze/*
+data/silver/*
+data/gold/*
+data/stream/stream_input/*
+data/stream/stream_output/*
+data/stream/stream_checkpoint/*
+data/stream/stream_late_output/*
+data/stream/stream_late_checkpoint/*
 
 *.parquet
 *.csv
