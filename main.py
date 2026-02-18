@@ -29,7 +29,7 @@ from streaming import transactions_stream
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--stage", required=True, choices=["bronze", "silver", "gold", "fraud", "stream", "warehouse", "test"])
+    parser.add_argument("--stage", required=True, choices=["batch","stream"])
     args = parser.parse_args()
 
     config = load_config()
@@ -43,25 +43,19 @@ def main():
 
     logger.info(f"Running stage: {args.stage}")
 
-    if args.stage == "bronze":
+    if args.stage == "batch":
         bronze_customers.run(spark, config, logger)
         bronze_products.run(spark, config, logger)
         bronze_transactions.run(spark, config, logger)
-    elif args.stage == "silver":
         silver_products.run(spark, config, logger)
         silver_transactions.run(spark, config, logger)
         silver_customers.run(spark, config, logger)
-    elif args.stage == "gold":
+        load_dimensions.run(spark, config, logger)
+        load_facts.run(spark, config, logger)
         gold_analytics.run(spark, config, logger)
-    elif args.stage == "fraud":
         fraud_detection.run(spark, config, logger)
     elif args.stage == "stream":
         transactions_stream.run(spark, config["paths"], logger)
-    elif args.stage == "warehouse":
-        load_dimensions.run(spark, config, logger)
-        load_facts.run(spark, config, logger)
-    elif args.stage == "test":
-        pass
 
 if __name__ == "__main__":
     main()
