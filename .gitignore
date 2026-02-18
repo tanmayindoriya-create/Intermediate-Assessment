@@ -6,12 +6,8 @@ __pycache__/
 env/
 .env
 
-data/bronze/
-data/silver/
-data/gold/
-data/stream_input
-data/stream_output
-data/stream_checkpoint
+data/
+
 *.parquet
 *.csv
 *.json

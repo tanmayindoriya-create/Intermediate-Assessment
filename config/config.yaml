@@ -7,9 +7,11 @@ paths:
   silver: data/silver
   gold: data/gold
   stream:
-    input: data/stream_input
-    output: data/stream_output
-    checkpoint: data/stream_checkpoint
+    input: data/stream/stream_input
+    output: data/stream/stream_output
+    checkpoint: data/stream/stream_checkpoint
+    late_output: data/stream/stream_late_output
+    late_checkpoint: data/stream/stream_late_checkpoint
 
 spark:
   app_name: data-platform

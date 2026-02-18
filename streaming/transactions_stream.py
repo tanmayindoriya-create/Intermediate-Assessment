@@ -8,6 +8,8 @@ def run(spark, config, logger):
     input_path = f"{config["stream"]["input"]}"
     output_path = f"{config["stream"]["output"]}"
     checkpoint_path = f"{config["stream"]["checkpoint"]}"
+    late_output_path = f"{config["stream"]["late_output"]}"
+    late_checkpoint_path = f"{config["stream"]["late_checkpoint"]}"
 
     schema = StructType([
         StructField("transaction_id", IntegerType()),
@@ -31,13 +33,21 @@ def run(spark, config, logger):
         F.to_timestamp("transaction_date")
     )
 
-    # Apply watermark (allow 2 days late data)
-    df_watermarked = df_stream.withWatermark("transaction_date", "2 days")
+    df_with_lateness = df_stream.withColumn(
+        "is_late",
+        F.col("transaction_date") <
+        F.current_timestamp() - F.expr("INTERVAL 2 DAYS")
+    )
 
-    # Window aggregation (daily revenue per customer)
+    df_valid = df_with_lateness.filter(~F.col("is_late"))
+    df_late = df_with_lateness.filter(F.col("is_late"))
+
+    df_valid = df_valid.withWatermark("transaction_date", "2 days")
+
+    df_deduped = df_valid.dropDuplicates(["transaction_id"])
+
     df_agg = (
-        df_watermarked
-        .filter(F.col("status") == "completed")
+        df_deduped
         .groupBy(
             F.window("transaction_date", "1 day"),
             F.col("customer_id")
@@ -48,7 +58,7 @@ def run(spark, config, logger):
         )
     )
 
-    query = (
+    main_query = (
         df_agg.writeStream
         .outputMode("append")
         .format("parquet")
@@ -57,5 +67,14 @@ def run(spark, config, logger):
         .start()
     )
 
+    late_query = (
+        df_late.writeStream
+        .outputMode("append")
+        .format("parquet")
+        .option("path", late_output_path)
+        .option("checkpointLocation", late_checkpoint_path)
+        .start()
+    )
+
     logger.info("Streaming query started")
-    query.awaitTermination()
+    spark.streams.awaitAnyTermination()
