@@ -15,6 +15,9 @@ from spark_jobs.silver import products as silver_products
 from spark_jobs.silver import transactions as silver_transactions
 from spark_jobs.silver import customers as silver_customers
 
+# warehouse imports
+from warehouse import load_dimensions, load_facts
+
 # gold imports
 from spark_jobs.gold import analytics as gold_analytics
 
@@ -26,7 +29,7 @@ from streaming import transactions_stream
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--stage", required=True, choices=["bronze", "silver", "gold", "fraud", "stream" ,"test"])
+    parser.add_argument("--stage", required=True, choices=["bronze", "silver", "gold", "fraud", "stream", "warehouse", "test"])
     args = parser.parse_args()
 
     config = load_config()
@@ -54,6 +57,9 @@ def main():
         fraud_detection.run(spark, config, logger)
     elif args.stage == "stream":
         transactions_stream.run(spark, config["paths"], logger)
+    elif args.stage == "warehouse":
+        load_dimensions.run(spark, config, logger)
+        load_facts.run(spark, config, logger)
     elif args.stage == "test":
         pass
 

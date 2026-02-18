@@ -1,7 +1,7 @@
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
-from utils.jdbc import write_to_mysql
-from utils.config import get_mysql_credentials
+import os
+
 
 def run(spark, config, logger):
     logger.info("Starting Silver transformation: customers (SCD2)")
@@ -10,12 +10,21 @@ def run(spark, config, logger):
     silver_path = f"{config['paths']['silver']}/customers"
 
     df_bronze = spark.read.parquet(bronze_path)
-    df_bronze = df_bronze \
-    .withColumn("signup_date", F.to_date("signup_date")) \
-    .withColumn("effective_from", F.to_date("effective_from")) \
-    .withColumn("effective_to", F.to_date("effective_to"))
 
-    window = Window.partitionBy("customer_id", "effective_from").orderBy(F.col("ingestion_ts").desc())
+    # Type normalization
+    df_bronze = (
+        df_bronze
+        .withColumn("signup_date", F.to_date("signup_date"))
+        .withColumn("effective_from", F.to_date("effective_from"))
+        .withColumn("effective_to", F.to_date("effective_to"))
+    )
+
+    # Keep latest ingestion per (customer_id, effective_from)
+    window = (
+        Window
+        .partitionBy("customer_id", "effective_from")
+        .orderBy(F.col("ingestion_ts").desc())
+    )
 
     df_latest = (
         df_bronze
@@ -24,8 +33,7 @@ def run(spark, config, logger):
         .drop("rn")
     )
 
-    import os
-
+    # Initial Load
     if not os.path.exists(silver_path):
         logger.info("Initial SCD2 load (no existing Silver)")
 
@@ -37,36 +45,29 @@ def run(spark, config, logger):
             .parquet(silver_path)
         )
 
-        credentials = get_mysql_credentials()
-
-        write_to_mysql(
-            df_final,
-            "dim_customer",
-            config,
-            credentials,
-            mode="overwrite"
-        )
-
-        logger.info("Saved data to mysql: dim_customer")
         logger.info("Completed initial Silver load: customers")
-
         return
-   
 
+    # Incremental SCD2 Handling
     df_silver = spark.read.parquet(silver_path)
 
-    df_joined = df_latest.alias("new").join(
-        df_silver.filter(F.col("is_current") == True).alias("old"),
-        on="customer_id",
-        how="left"
+    df_joined = (
+        df_latest.alias("new")
+        .join(
+            df_silver.filter(F.col("is_current") == True).alias("old"),
+            on="customer_id",
+            how="left"
+        )
     )
 
+    # Detect new or changed records
     df_changed = df_joined.filter(
         (F.col("old.customer_id").isNull()) |
         (F.col("new.name") != F.col("old.name")) |
         (F.col("new.region") != F.col("old.region"))
     )
 
+    # Close old current records
     df_old_closed = (
         df_silver.filter(F.col("is_current") == True)
         .join(df_changed.select("customer_id"), on="customer_id")
@@ -74,20 +75,27 @@ def run(spark, config, logger):
         .withColumn("effective_to", F.current_date())
     )
 
+    # Keep unchanged records
     df_unchanged = df_silver.join(
         df_old_closed.select("customer_id"),
         on="customer_id",
         how="left_anti"
     )
 
-
+    # Insert new versions
     df_new_versions = (
         df_changed.select("new.*")
         .withColumn("is_current", F.lit(True))
-        .withColumn("effective_to", F.lit(None).cast("string"))
+        .withColumn("effective_to", F.lit(None).cast("date"))
     )
 
-    df_final = df_unchanged.unionByName(df_old_closed).unionByName(df_new_versions)
+    df_final = (
+        df_unchanged
+        .unionByName(df_old_closed)
+        .unionByName(df_new_versions)
+    )
+
+    # Materialize before overwrite to avoid read/write conflict
     df_final = df_final.cache()
     df_final.count()
 
@@ -98,15 +106,3 @@ def run(spark, config, logger):
     )
 
     logger.info("Completed Silver transformation: customers (SCD2)")
-
-    credentials = get_mysql_credentials()
-
-    write_to_mysql(
-        df_final,
-        "dim_customer",
-        config,
-        credentials,
-        mode="overwrite"
-    )
-
-    logger.info("Saved data to mysql: dim_customers")
