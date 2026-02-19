@@ -1,6 +1,5 @@
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
-import os
 
 
 def run(spark, config, logger):
@@ -9,95 +8,65 @@ def run(spark, config, logger):
     bronze_path = f"{config['paths']['bronze']}/customers"
     silver_path = f"{config['paths']['silver']}/customers"
 
-    df_bronze = spark.read.parquet(bronze_path)
+    df = spark.read.parquet(bronze_path)
 
     # Type normalization
-    df_bronze = (
-        df_bronze
-        .withColumn("signup_date", F.to_date("signup_date"))
-        .withColumn("effective_from", F.to_date("effective_from"))
-        .withColumn("effective_to", F.to_date("effective_to"))
+    df = (
+        df.withColumn("signup_date", F.to_date("signup_date"))
+          .withColumn("event_ts", F.to_timestamp("event_ts"))
     )
 
-    # Keep latest ingestion per (customer_id, effective_from)
-    window = (
-        Window
-        .partitionBy("customer_id", "effective_from")
-        .orderBy(F.col("ingestion_ts").desc())
+    # Remove exact duplicates
+    df = df.dropDuplicates(["customer_id", "event_ts", "region"])
+
+    # Order events per customer
+    base_window = Window.partitionBy("customer_id").orderBy("event_ts")
+
+    # Detect change from previous region
+    df = df.withColumn(
+        "prev_region",
+        F.lag("region").over(base_window)
     )
 
-    df_latest = (
-        df_bronze
-        .withColumn("rn", F.row_number().over(window))
-        .filter(F.col("rn") == 1)
-        .drop("rn")
+    df = df.filter(
+        (F.col("prev_region").isNull()) |
+        (F.col("region") != F.col("prev_region"))
+    ).drop("prev_region")
+
+    window_fill = base_window.rowsBetween(Window.unboundedPreceding, 0)
+
+    df = df.withColumn(
+        "signup_date",
+        F.last("signup_date", ignorenulls=True).over(window_fill)
     )
 
-    # Initial Load
-    if not os.path.exists(silver_path):
-        logger.info("Initial SCD2 load (no existing Silver)")
-
-        df_final = df_latest
-
-        (
-            df_final.write
-            .mode("overwrite")
-            .parquet(silver_path)
-        )
-
-        logger.info("Completed initial Silver load: customers")
-        return
-
-    # Incremental SCD2 Handling
-    df_silver = spark.read.parquet(silver_path)
-
-    df_joined = (
-        df_latest.alias("new")
-        .join(
-            df_silver.filter(F.col("is_current") == True).alias("old"),
-            on="customer_id",
-            how="left"
-        )
+    # Compute SCD columns
+    df = df.withColumn(
+        "effective_from",
+        F.col("event_ts")
     )
 
-    # Detect new or changed records
-    df_changed = df_joined.filter(
-        (F.col("old.customer_id").isNull()) |
-        (F.col("new.name") != F.col("old.name")) |
-        (F.col("new.region") != F.col("old.region"))
+    df = df.withColumn(
+        "effective_to",
+        F.lead("event_ts").over(base_window)
     )
 
-    # Close old current records
-    df_old_closed = (
-        df_silver.filter(F.col("is_current") == True)
-        .join(df_changed.select("customer_id"), on="customer_id")
-        .withColumn("is_current", F.lit(False))
-        .withColumn("effective_to", F.current_date())
+    df = df.withColumn(
+        "is_current",
+        F.when(F.col("effective_to").isNull(), True)
+         .otherwise(False)
     )
 
-    # Keep unchanged records
-    df_unchanged = df_silver.join(
-        df_old_closed.select("customer_id"),
-        on="customer_id",
-        how="left_anti"
+    # Select final columns
+    df_final = df.select(
+        "customer_id",
+        "name",
+        "region",
+        "signup_date",
+        "effective_from",
+        "effective_to",
+        "is_current"
     )
-
-    # Insert new versions
-    df_new_versions = (
-        df_changed.select("new.*")
-        .withColumn("is_current", F.lit(True))
-        .withColumn("effective_to", F.lit(None).cast("date"))
-    )
-
-    df_final = (
-        df_unchanged
-        .unionByName(df_old_closed)
-        .unionByName(df_new_versions)
-    )
-
-    # Materialize before overwrite to avoid read/write conflict
-    df_final = df_final.cache()
-    df_final.count()
 
     (
         df_final.write

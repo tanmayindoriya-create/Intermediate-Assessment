@@ -1,5 +1,8 @@
 from pyspark.sql import functions as F
-from pyspark.sql.types import StructType, StructField, IntegerType, StringType, BooleanType
+from pyspark.sql.types import (
+    StructType, StructField, IntegerType,
+    StringType
+)
 
 
 def run(spark, config, logger):
@@ -7,42 +10,69 @@ def run(spark, config, logger):
 
     raw_path = f"{config['paths']['raw']}/customers.csv"
     bronze_path = f"{config['paths']['bronze']}/customers"
+    invalid_path = f"{config['paths']['bronze']}/customers_invalid"
 
     schema = StructType([
-        StructField("customer_id", IntegerType(), False),
+        StructField("customer_id", IntegerType(), True),
         StructField("name", StringType(), True),
         StructField("region", StringType(), True),
         StructField("signup_date", StringType(), True),
-        StructField("is_current", BooleanType(), True),
-        StructField("effective_from", StringType(), True),
-        StructField("effective_to", StringType(), True),
+        StructField("event_ts", StringType(), True),
     ])
 
     df = (
         spark.read
         .option("header", True)
+        .option("mode", "PERMISSIVE")
         .schema(schema)
         .csv(raw_path)
     )
 
-    total_count = df.count()
-    logger.info(f"Raw records read: {total_count}")
+    # Add ingestion metadata
+    df = (
+        df.withColumn("ingestion_ts", F.current_timestamp())
+          .withColumn("ingestion_date", F.to_date("ingestion_ts"))
+          .withColumn("source_file", F.input_file_name())
+    )
 
-    df_clean = df.dropna(subset=["customer_id"])
+    # Basic structural validation (Bronze only)
+    df_valid = df.filter(
+        (F.col("customer_id").isNotNull()) &
+        (F.col("event_ts").isNotNull())
+    )
 
-    clean_count = df_clean.count()
-    dropped = total_count - clean_count
+    df_invalid = df.filter(
+        (F.col("customer_id").isNull()) |
+        (F.col("event_ts").isNull())
+    )
 
-    logger.info(f"Valid records: {clean_count}")
-    logger.info(f"Dropped corrupt records: {dropped}")
+    counts = (
+        df.withColumn(
+            "is_valid",
+            (F.col("customer_id").isNotNull()) &
+            (F.col("event_ts").isNotNull())
+        )
+        .groupBy("is_valid")
+        .count()
+        .collect()
+    )
 
-    df_clean = df_clean.withColumn("ingestion_ts", F.current_timestamp())
+    logger.info(f"Record breakdown: {counts}")
 
+    # Write valid records
     (
-        df_clean.write
+        df_valid.write
         .mode("append")
-        .partitionBy("signup_date")
+        .partitionBy("ingestion_date")
         .parquet(bronze_path)
+    )
+
+    # Write invalid separately
+    (
+        df_invalid.write
+        .mode("append")
+        .partitionBy("ingestion_date")
+        .parquet(invalid_path)
     )
 
     logger.info("Completed Bronze ingestion: customers")

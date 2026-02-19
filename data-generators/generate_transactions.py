@@ -37,6 +37,6 @@ df = pd.DataFrame(data, columns=[
 # Add duplicates
 df = pd.concat([df, df.sample(2000)])
 
-df.to_csv("../data/raw/transactions.csv", index=False)
+df.to_csv("data/raw/transactions.csv", index=False)
 
 print("Generated 150K transactions + duplicates.")

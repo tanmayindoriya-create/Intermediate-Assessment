@@ -3,53 +3,45 @@ import random
 from datetime import datetime, timedelta
 
 N = 50000
-regions = ["North","South","East","West","Central"]
+regions = ["North", "South", "East", "West", "Central"]
 
 data = []
-start = datetime(2024,1,1)
+start = datetime(2024, 1, 1)
 
-for i in range(1, N+1):
+for i in range(1, N + 1):
     signup = start + timedelta(days=random.randint(0, 700))
+
+    # Initial record
     data.append([
         i,
         f"Customer{i}",
         random.choice(regions),
         signup.strftime("%Y-%m-%d"),
-        True,
-        signup.strftime("%Y-%m-%d"),
-        None
+        signup.strftime("%Y-%m-%d")  # event timestamp
+    ])
+
+# Simulate region change for 10% customers
+updates = random.sample(range(1, N + 1), int(N * 0.1))
+
+for customer_id in updates:
+    change_date = datetime(2026, 1, 1)
+
+    data.append([
+        customer_id,
+        f"Customer{customer_id}",
+        random.choice(regions),
+        None,  # signup_date not changed
+        change_date.strftime("%Y-%m-%d")
     ])
 
 df = pd.DataFrame(data, columns=[
-    "customer_id","name","region",
-    "signup_date","is_current",
-    "effective_from","effective_to"
+    "customer_id",
+    "name",
+    "region",
+    "signup_date",
+    "event_ts"
 ])
 
-# Add SCD Type 2 changes (10% customers move region)
-updates = df.sample(int(N*0.1))
+df.to_csv("data/raw/customers.csv", index=False)
 
-scd_records = []
-for _, row in updates.iterrows():
-    change_date = datetime(2026,1,1)
-
-    old_row = row.copy()
-    old_row["is_current"] = False
-    old_row["effective_to"] = change_date.strftime("%Y-%m-%d")
-    scd_records.append(old_row.tolist())
-
-    scd_records.append([
-        row["customer_id"],
-        row["name"],
-        random.choice(regions),
-        row["signup_date"],
-        True,
-        change_date.strftime("%Y-%m-%d"),
-        None
-    ])
-
-
-df = pd.concat([df, pd.DataFrame(scd_records, columns=df.columns)])
-df.to_csv("../data/raw/customers.csv", index=False)
-
-print("Generated 50K customers + SCD records.")
+print("Generated customers with change events (no SCD columns in raw).")

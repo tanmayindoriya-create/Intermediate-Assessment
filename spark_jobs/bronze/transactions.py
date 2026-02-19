@@ -1,6 +1,7 @@
 from pyspark.sql import functions as F
 from pyspark.sql.types import (
-    StructType, StructField, IntegerType, DoubleType, StringType
+    StructType, StructField, IntegerType,
+    DoubleType, StringType
 )
 
 
@@ -9,9 +10,10 @@ def run(spark, config, logger):
 
     raw_path = f"{config['paths']['raw']}/transactions.csv"
     bronze_path = f"{config['paths']['bronze']}/transactions"
+    invalid_path = f"{config['paths']['bronze']}/transactions_invalid"
 
     schema = StructType([
-        StructField("transaction_id", IntegerType(), False),
+        StructField("transaction_id", IntegerType(), True),
         StructField("customer_id", IntegerType(), True),
         StructField("product_id", IntegerType(), True),
         StructField("amount", DoubleType(), True),
@@ -23,28 +25,49 @@ def run(spark, config, logger):
     df = (
         spark.read
         .option("header", True)
+        .option("mode", "PERMISSIVE")
         .schema(schema)
         .csv(raw_path)
     )
 
-    total_count = df.count()
-    logger.info(f"Raw records read: {total_count}")
+    df = (
+        df.withColumn("ingestion_ts", F.current_timestamp())
+          .withColumn("ingestion_date", F.to_date("ingestion_ts"))
+          .withColumn("source_file", F.input_file_name())
+    )
 
-    df_clean = df.dropna(subset=["transaction_id"])
+    df_valid = df.filter(
+        (F.col("transaction_id").isNotNull()) &
+        (F.col("amount") > 0)
+    )
 
-    clean_count = df_clean.count()
-    dropped = total_count - clean_count
+    df_invalid = df.subtract(df_valid)
 
-    logger.info(f"Valid records: {clean_count}")
-    logger.info(f"Dropped corrupt records: {dropped}")
+    counts = (
+        df.withColumn(
+            "is_valid",
+            (F.col("transaction_id").isNotNull()) &
+            (F.col("amount") > 0)
+        )
+        .groupBy("is_valid")
+        .count()
+        .collect()
+    )
 
-    df_clean = df_clean.withColumn("ingestion_ts", F.current_timestamp())
+    logger.info(f"Record breakdown: {counts}")
 
     (
-        df_clean.write
+        df_valid.write
         .mode("append")
-        .partitionBy("transaction_date")
+        .partitionBy("ingestion_date")
         .parquet(bronze_path)
+    )
+
+    (
+        df_invalid.write
+        .mode("append")
+        .partitionBy("ingestion_date")
+        .parquet(invalid_path)
     )
 
     logger.info("Completed Bronze ingestion: transactions")

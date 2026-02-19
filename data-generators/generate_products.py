@@ -17,5 +17,5 @@ df = pd.DataFrame(data, columns=[
     "product_id","product_name","category","price"
 ])
 
-df.to_csv("../data/raw/products.csv", index=False)
+df.to_csv("data/raw/products.csv", index=False)
 print("Generated 5000 products.")

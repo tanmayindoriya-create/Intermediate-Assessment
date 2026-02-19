@@ -21,7 +21,7 @@ for i in range(100000):
         "response_time_ms": random.randint(50,2000)
     })
 
-with open("../data/logs/app_logs.json","w") as f:
+with open("data/logs/app_logs.json","w") as f:
     json.dump(records,f)
 
 print("Generated 100K logs.")

@@ -29,7 +29,7 @@ from streaming import transactions_stream
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--stage", required=True, choices=["batch","stream"])
+    parser.add_argument("--stage", required=True, choices=["batch","stream","test"])
     args = parser.parse_args()
 
     config = load_config()
@@ -56,6 +56,8 @@ def main():
         fraud_detection.run(spark, config, logger)
     elif args.stage == "stream":
         transactions_stream.run(spark, config["paths"], logger)
+    elif args.stage == "test":
+        pass
 
 if __name__ == "__main__":
     main()
